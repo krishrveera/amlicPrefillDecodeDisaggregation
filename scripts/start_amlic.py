@@ -30,7 +30,7 @@ ENV_FILE     = PROJECT_ROOT / ".env"
 STATE_FILE   = PROJECT_ROOT / ".amlic_state.json"
 
 PREFILL = {
-    "name":     "amlic-prefill",
+    "name":     "prefill-vm",
     "gpu_type": "nvidia-l4",
     "project":  "hpmlproj",
     "port":     8100,
@@ -38,7 +38,7 @@ PREFILL = {
     "use_iap":  False,
 }
 DECODE = {
-    "name":     "amlic-decode",
+    "name":     "decode-vm",
     "gpu_type": "nvidia-tesla-t4",
     "project":  "amlic-proj",
     "port":     8200,
@@ -71,8 +71,64 @@ def check_prereqs():
 
 # ── VM provisioning ───────────────────────────────────────────────────────────
 
+def find_existing_vm(vm: dict) -> tuple[str | None, str | None]:
+    """Look up an existing VM by name. Returns (zone, status) or (None, None)."""
+    result = subprocess.run(
+        [
+            "gcloud", "compute", "instances", "list",
+            f"--filter=name={vm['name']}",
+            f"--project={vm['project']}",
+            "--format=json",
+        ],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return None, None
+    try:
+        instances = json.loads(result.stdout)
+        if instances:
+            zone   = instances[0]["zone"].split("/")[-1]
+            status = instances[0].get("status", "UNKNOWN")
+            return zone, status
+    except (json.JSONDecodeError, KeyError, IndexError):
+        pass
+    return None, None
+
+
+def ensure_vm_running(vm: dict, zone: str, status: str):
+    """Start a VM that exists but is not yet RUNNING."""
+    if status == "RUNNING":
+        return
+    print(f"[{vm['name']}] Status={status}, starting VM in {zone}...")
+    result = subprocess.run(
+        [
+            "gcloud", "compute", "instances", "start", vm["name"],
+            f"--zone={zone}", f"--project={vm['project']}", "--quiet",
+        ],
+        capture_output=True, text=True, timeout=180,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to start {vm['name']}: {result.stderr.strip() or result.stdout.strip()}"
+        )
+
+
 def run_checker(vm: dict) -> tuple[str | None, str, int]:
-    """Run krv2123_gcp_gpu_checker.py for one VM. Returns (zone, stdout, returncode)."""
+    """
+    Provision one VM:
+      1. If VM already exists (any status) — start it if stopped, return its zone.
+      2. Otherwise — run the GPU checker to find a zone with capacity and create it.
+    Returns (zone, stdout, returncode).
+    """
+    zone, status = find_existing_vm(vm)
+    if zone:
+        print(f"[{vm['name']}] Found existing VM in {zone} (status={status}).")
+        try:
+            ensure_vm_running(vm, zone, status)
+        except RuntimeError as e:
+            return None, str(e), 1
+        return zone, f"WINNER_ZONE={zone}\n", 0
+
     cmd = [
         sys.executable,
         str(SCRIPTS_DIR / "krv2123_gcp_gpu_checker.py"),
@@ -83,7 +139,7 @@ def run_checker(vm: dict) -> tuple[str | None, str, int]:
         "--project",  vm["project"],
         "--price-limit", "2.00",
     ]
-    print(f"[{vm['name']}] Searching for {vm['gpu_type']} in project {vm['project']}...")
+    print(f"[{vm['name']}] No existing VM found. Searching for {vm['gpu_type']} in project {vm['project']}...")
     result = subprocess.run(cmd, capture_output=False, text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
@@ -239,16 +295,16 @@ def stop_vms():
     if not prefill_zone or not decode_zone:
         sys.exit("ERROR: State file is missing zone info.")
 
-    print(f"Stopping amlic-prefill in {prefill_zone} (hpmlproj)...")
+    print(f"Stopping {PREFILL['name']} in {prefill_zone} ({PREFILL['project']})...")
     subprocess.run([
-        "gcloud", "compute", "instances", "stop", "amlic-prefill",
-        f"--zone={prefill_zone}", "--project=hpmlproj", "--quiet",
+        "gcloud", "compute", "instances", "stop", PREFILL["name"],
+        f"--zone={prefill_zone}", f"--project={PREFILL['project']}", "--quiet",
     ], check=False)
 
-    print(f"Stopping amlic-decode in {decode_zone} (amlic-proj)...")
+    print(f"Stopping {DECODE['name']} in {decode_zone} ({DECODE['project']})...")
     subprocess.run([
-        "gcloud", "compute", "instances", "stop", "amlic-decode",
-        f"--zone={decode_zone}", "--project=amlic-proj", "--quiet",
+        "gcloud", "compute", "instances", "stop", DECODE["name"],
+        f"--zone={decode_zone}", f"--project={DECODE['project']}", "--quiet",
     ], check=False)
 
     print("Both VMs stopped. Cost billing ceased.")
@@ -297,16 +353,16 @@ def main():
         decode_zone,  decode_out,  decode_rc  = decode_future.result()
 
     if not prefill_zone:
-        print("ERROR: Failed to provision prefill VM (L4 on hpmlproj).")
+        print(f"ERROR: Failed to provision {PREFILL['name']} (L4 on {PREFILL['project']}).")
         print(prefill_out[-3000:])
         sys.exit(1)
     if not decode_zone:
-        print("ERROR: Failed to provision decode VM (T4 on amlic-proj).")
+        print(f"ERROR: Failed to provision {DECODE['name']} (T4 on {DECODE['project']}).")
         print(decode_out[-3000:])
         sys.exit(1)
 
-    print(f"[OK] amlic-prefill provisioned in {prefill_zone} (hpmlproj)")
-    print(f"[OK] amlic-decode  provisioned in {decode_zone}  (amlic-proj)")
+    print(f"[OK] {PREFILL['name']} ready in {prefill_zone} ({PREFILL['project']})")
+    print(f"[OK] {DECODE['name']}  ready in {decode_zone}  ({DECODE['project']})")
 
     # ── Persist zones for --stop ───────────────────────────────────────────────
     STATE_FILE.write_text(json.dumps({
