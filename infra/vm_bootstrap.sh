@@ -44,24 +44,14 @@ fi
 source "$VENV_DIR/bin/activate"
 pip install --upgrade pip setuptools wheel -q
 
-# ── 4. Install vLLM + NIXL ─────────────────────────────────────────────────
-# Pin versions once they work — update these after Phase 3 succeeds.
-VLLM_VERSION="vllm"       # e.g., "vllm==0.8.5" once pinned
-NIXL_VERSION="nixl"       # e.g., "nixl==0.1.0" once pinned
+# ── 4. Install vLLM ─────────────────────────────────────────────────────────
+VLLM_VERSION="vllm"       # e.g., "vllm==0.19.1" once pinned
 
-echo "[4/6] Installing vLLM..."
+echo "[4/5] Installing vLLM..."
 pip install "$VLLM_VERSION" -q 2>&1 | tail -5
 
-echo "[5/6] Installing NIXL..."
-pip install "$NIXL_VERSION" -q 2>&1 | tail -5 || {
-    echo "WARNING: NIXL pip install failed. Trying from GitHub..."
-    pip install "git+https://github.com/ai-dynamo/nixl.git" -q 2>&1 | tail -5 || {
-        echo "WARNING: NIXL install failed. LMCache path does not require NIXL."
-    }
-}
-
 # ── 5. Install additional dependencies ──────────────────────────────────────
-echo "[6/6] Installing additional packages..."
+echo "[5/5] Installing additional packages..."
 pip install httpx fastapi uvicorn lmcache -q
 
 # ── 6. Verify installation ──────────────────────────────────────────────────
@@ -72,7 +62,6 @@ echo "============================================"
 echo "Python:   $(python3 --version)"
 echo "vLLM:     $(python3 -c 'import vllm; print(vllm.__version__)' 2>/dev/null || echo 'NOT INSTALLED')"
 echo "LMCache:  $(python3 -c 'import lmcache; print(lmcache.__version__)' 2>/dev/null || echo 'NOT INSTALLED')"
-echo "NIXL:     $(python3 -c 'import nixl; print("OK")' 2>/dev/null || echo 'NOT INSTALLED')"
 echo "PyTorch:  $(python3 -c 'import torch; print(torch.__version__)' 2>/dev/null || echo 'NOT INSTALLED')"
 echo "CUDA:     $(python3 -c 'import torch; print(torch.version.cuda)' 2>/dev/null || echo 'NOT AVAILABLE')"
 echo "GPU:      $(python3 -c 'import torch; print(torch.cuda.get_device_name(0))' 2>/dev/null || echo 'NOT AVAILABLE')"
