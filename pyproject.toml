@@ -24,6 +24,9 @@ dependencies = [
     "aiohttp>=3.9",
 ]
 
+[project.scripts]
+amlic-start = "scripts.start_amlic:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",

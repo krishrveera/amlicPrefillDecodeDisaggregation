@@ -51,5 +51,8 @@ logs/
 *.pem
 *.key
 
+# AMLIC runtime state (zone info written by start_amlic.py)
+.amlic_state.json
+
 # Claude Code transient files
 .claude/
