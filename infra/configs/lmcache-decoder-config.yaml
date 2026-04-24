@@ -1,0 +1,5 @@
+local_cpu: False
+max_local_cpu_size: 0
+max_local_disk_size: 0
+remote_url: "redis://${REDIS_HOST}:6379"
+remote_serde: "naive"

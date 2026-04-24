@@ -104,16 +104,12 @@ def get_next_client(app_state, service_type: str):
 async def send_prefill_request(
     client_info: dict, endpoint: str, req_data: dict, request_id: str
 ):
-    """Send to prefill with max_tokens=1, get back kv_transfer_params."""
+    """Send to prefill with max_tokens=1, triggering KV cache production.
+
+    With LMCacheConnectorV1, KV transfer happens via Redis — no explicit
+    kv_transfer_params needed. The prefill response may omit them entirely.
+    """
     req_data = req_data.copy()
-    req_data["kv_transfer_params"] = {
-        "do_remote_decode": True,
-        "do_remote_prefill": False,
-        "remote_engine_id": None,
-        "remote_block_ids": None,
-        "remote_host": None,
-        "remote_port": None,
-    }
     req_data["stream"] = False
     req_data["max_tokens"] = 1
     if "max_completion_tokens" in req_data:
@@ -180,12 +176,16 @@ async def _handle_completions(api: str, request: Request):
             prefill_client, api, req_data, request_id
         )
 
-        # 2. Extract KV transfer params
+        # 2. Extract KV transfer params (NIXL only — LMCacheConnectorV1 uses
+        #    Redis internally and does not return params here)
         response_json = response.json()
         await response.aclose()
         kv_transfer_params = response_json.get("kv_transfer_params", {})
         if kv_transfer_params:
             req_data["kv_transfer_params"] = kv_transfer_params
+        else:
+            # Ensure no stale kv_transfer_params reach the decoder
+            req_data.pop("kv_transfer_params", None)
 
         # 3. Stream from decode
         decode_client = get_next_client(request.app.state, "decode")

@@ -15,7 +15,7 @@ echo "[1/6] Installing system packages..."
 sudo apt-get update -qq
 sudo apt-get install -y -qq \
     python3-pip python3-venv git curl wget htop tmux \
-    net-tools iperf3 netcat-openbsd jq
+    net-tools iperf3 netcat-openbsd jq redis-tools
 
 # ── 2. Verify NVIDIA drivers + CUDA ─────────────────────────────────────────
 echo "[2/6] Checking NVIDIA drivers..."
@@ -56,14 +56,13 @@ echo "[5/6] Installing NIXL..."
 pip install "$NIXL_VERSION" -q 2>&1 | tail -5 || {
     echo "WARNING: NIXL pip install failed. Trying from GitHub..."
     pip install "git+https://github.com/ai-dynamo/nixl.git" -q 2>&1 | tail -5 || {
-        echo "ERROR: NIXL install failed. Will need manual build."
-        echo "  See: https://github.com/ai-dynamo/nixl"
+        echo "WARNING: NIXL install failed. LMCache path does not require NIXL."
     }
 }
 
 # ── 5. Install additional dependencies ──────────────────────────────────────
 echo "[6/6] Installing additional packages..."
-pip install httpx fastapi uvicorn -q
+pip install httpx fastapi uvicorn lmcache -q
 
 # ── 6. Verify installation ──────────────────────────────────────────────────
 echo ""
@@ -72,6 +71,7 @@ echo "  Verification"
 echo "============================================"
 echo "Python:   $(python3 --version)"
 echo "vLLM:     $(python3 -c 'import vllm; print(vllm.__version__)' 2>/dev/null || echo 'NOT INSTALLED')"
+echo "LMCache:  $(python3 -c 'import lmcache; print(lmcache.__version__)' 2>/dev/null || echo 'NOT INSTALLED')"
 echo "NIXL:     $(python3 -c 'import nixl; print("OK")' 2>/dev/null || echo 'NOT INSTALLED')"
 echo "PyTorch:  $(python3 -c 'import torch; print(torch.__version__)' 2>/dev/null || echo 'NOT INSTALLED')"
 echo "CUDA:     $(python3 -c 'import torch; print(torch.version.cuda)' 2>/dev/null || echo 'NOT AVAILABLE')"
