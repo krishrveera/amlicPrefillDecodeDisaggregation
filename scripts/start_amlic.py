@@ -19,6 +19,8 @@ import re
 import subprocess
 import sys
 import time
+import urllib.request
+import urllib.error
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -161,6 +163,29 @@ def ssh_run(vm: dict, zone: str, command: str):
     return result.stdout
 
 
+def wait_for_health(name: str, ip: str, port: int, timeout: int = 300, interval: int = 10):
+    """Poll http://{ip}:{port}/health until 200 or timeout (seconds)."""
+    url = f"http://{ip}:{port}/health"
+    deadline = time.time() + timeout
+    attempt = 0
+    while time.time() < deadline:
+        attempt += 1
+        try:
+            with urllib.request.urlopen(url, timeout=5) as resp:
+                if resp.status == 200:
+                    print(f"[Health] {name} ready after {attempt} poll(s).")
+                    return
+        except Exception:
+            pass
+        remaining = int(deadline - time.time())
+        print(f"[Health] {name} not ready (attempt {attempt}, {remaining}s left) — retrying in {interval}s...")
+        time.sleep(interval)
+    raise RuntimeError(
+        f"{name} health check timed out after {timeout}s. "
+        f"Check logs: sudo docker logs -f amlic-{'prefill' if 'prefill' in name.lower() else 'decode'}"
+    )
+
+
 def start_services(prefill_zone: str, decode_zone: str, prefill_ip: str, decode_ip: str):
     """Start Redis, prefill, decode, and proxy in the correct order."""
     print("\n[Services] Starting Redis + prefill vLLM on prefill VM...")
@@ -170,7 +195,8 @@ def start_services(prefill_zone: str, decode_zone: str, prefill_ip: str, decode_
         "bash infra/start_redis.sh && "
         "bash infra/start_prefill_lmcache.sh",
     )
-    print("[Services] Prefill VM services started.")
+    print("[Services] Prefill container launched (detached). Waiting for /health...")
+    wait_for_health("Prefill", prefill_ip, PREFILL["port"])
 
     print("[Services] Starting decode vLLM on decode VM...")
     ssh_run(
@@ -178,7 +204,8 @@ def start_services(prefill_zone: str, decode_zone: str, prefill_ip: str, decode_
         "cd ~/amlic && git pull --ff-only && "
         "bash infra/start_decode_lmcache.sh",
     )
-    print("[Services] Decode VM services started.")
+    print("[Services] Decode container launched (detached). Waiting for /health...")
+    wait_for_health("Decode", decode_ip, DECODE["port"])
 
     print("[Services] Starting disaggregated proxy locally...")
     proxy_cmd = [
