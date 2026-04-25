@@ -90,9 +90,11 @@ log = logging.getLogger(__name__)
 # ── Thread-safe API call counter ──────────────────────────────────────────────
 _api_lock  = threading.Lock()
 _api_count = 0
-_cost_tracker    = None   # set in main()
+_cost_tracker         = None   # set in main()
 _vm_name_override: Optional[str] = None   # set via --vm-name
 _keep_vm: bool = False                    # set via --keep
+_machine_type_override: Optional[str] = None  # set via --machine-type
+_boot_disk_gb: str = "20"                 # set via --boot-disk-size
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -228,8 +230,9 @@ def try_create_vm(zone: str, gpu: str) -> tuple[bool, float, str]:
     If --keep was given, leaves the VM running after creation.
     Otherwise stops the VM so it can be restarted at any time.
     """
-    machine = GPU_MACHINE[gpu]
+    machine = _machine_type_override or GPU_MACHINE[gpu]
     name    = _vm_name_override or f"gpuchk-{zone.replace('-', '')[:10]}-{int(time.time()) % 100000}"
+    disk_gb = _boot_disk_gb
     t0      = time.perf_counter()
 
     rc, _, stderr = run_gcloud([
@@ -238,7 +241,7 @@ def try_create_vm(zone: str, gpu: str) -> tuple[bool, float, str]:
         "--machine-type",       machine,
         "--image-family",       "debian-12",
         "--image-project",      "debian-cloud",
-        "--boot-disk-size",     BOOT_DISK_GB,
+        "--boot-disk-size",     disk_gb,
         "--accelerator",        f"type={gpu},count=1",
         "--maintenance-policy", "TERMINATE",
         "--no-restart-on-failure",
@@ -825,13 +828,17 @@ Examples:
                     help="Restrict search to a single GPU type (e.g. nvidia-l4)")
     ap.add_argument("--vm-name",     default=None,
                     help="Name for the created VM (default: auto-generated gpuchk-...)")
-    ap.add_argument("--keep",        action="store_true",
+    ap.add_argument("--keep",          action="store_true",
                     help="Keep the VM running after creation instead of stopping it")
-    ap.add_argument("--project",     default=None,
+    ap.add_argument("--project",       default=None,
                     help="GCP project ID (overrides GCP_PROJECT_ID env var)")
+    ap.add_argument("--machine-type",  default=None,
+                    help="Override machine type (e.g. g2-standard-8, n1-standard-8)")
+    ap.add_argument("--boot-disk-size", default=None,
+                    help="Boot disk size in GB (e.g. 150, default: 20)")
     args = ap.parse_args()
 
-    global PROJECT, _cost_tracker, _vm_name_override, _keep_vm
+    global PROJECT, _cost_tracker, _vm_name_override, _keep_vm, _machine_type_override, _boot_disk_gb
 
     if args.project:
         PROJECT = args.project
@@ -843,8 +850,11 @@ Examples:
     if args.gpu_type:
         GPU_TYPES[:] = [args.gpu_type]
 
-    _vm_name_override = args.vm_name
-    _keep_vm          = args.keep
+    _vm_name_override      = args.vm_name
+    _keep_vm               = args.keep
+    _machine_type_override = args.machine_type
+    if args.boot_disk_size:
+        _boot_disk_gb = args.boot_disk_size
 
     try:
         subprocess.run(["gcloud", "--version"], capture_output=True, timeout=10)

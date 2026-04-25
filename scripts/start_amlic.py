@@ -30,20 +30,24 @@ ENV_FILE     = PROJECT_ROOT / ".env"
 STATE_FILE   = PROJECT_ROOT / ".amlic_state.json"
 
 PREFILL = {
-    "name":     "prefill-vm",
-    "gpu_type": "nvidia-l4",
-    "project":  "hpmlproj",
-    "port":     8100,
-    "cost_hr":  0.71 + 0.22,   # L4 GPU + g2-standard-4 machine
-    "use_iap":  False,
+    "name":         "prefill-vm",
+    "gpu_type":     "nvidia-l4",
+    "machine_type": "g2-standard-8",   # 8 vCPU, 32GB RAM — needed for vLLM multiprocessing
+    "disk_gb":      "150",
+    "project":      "hpmlproj",
+    "port":         8100,
+    "cost_hr":      0.71 + 0.40,       # L4 GPU + g2-standard-8 machine
+    "use_iap":      False,
 }
 DECODE = {
-    "name":     "decode-vm",
-    "gpu_type": "nvidia-tesla-t4",
-    "project":  "amlic-proj",
-    "port":     8200,
-    "cost_hr":  0.35 + 0.19,   # T4 GPU + n1-standard-4 machine
-    "use_iap":  True,
+    "name":         "decode-vm",
+    "gpu_type":     "nvidia-tesla-t4",
+    "machine_type": "n1-standard-8",   # 8 vCPU, 30GB RAM — needed for vLLM multiprocessing
+    "disk_gb":      "150",
+    "project":      "amlic-proj",
+    "port":         8200,
+    "cost_hr":      0.35 + 0.38,       # T4 GPU + n1-standard-8 machine
+    "use_iap":      True,
 }
 
 COLLOCATED_PORT = 8000
@@ -132,12 +136,14 @@ def run_checker(vm: dict) -> tuple[str | None, str, int]:
     cmd = [
         sys.executable,
         str(SCRIPTS_DIR / "krv2123_gcp_gpu_checker.py"),
-        "--method",   "B",
+        "--method",         "B",
         "--keep",
-        "--gpu-type", vm["gpu_type"],
-        "--vm-name",  vm["name"],
-        "--project",  vm["project"],
-        "--price-limit", "2.00",
+        "--gpu-type",       vm["gpu_type"],
+        "--vm-name",        vm["name"],
+        "--project",        vm["project"],
+        "--machine-type",   vm["machine_type"],
+        "--boot-disk-size", vm["disk_gb"],
+        "--price-limit",    "2.00",
     ]
     print(f"[{vm['name']}] No existing VM found. Searching for {vm['gpu_type']} in project {vm['project']}...")
     result = subprocess.run(cmd, capture_output=False, text=True,
