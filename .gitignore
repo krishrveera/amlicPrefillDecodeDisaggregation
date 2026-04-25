@@ -56,3 +56,6 @@ logs/
 
 # Claude Code transient files
 .claude/
+*.txt
+claude_code_prompt_lmcache.md
+krv2123_gcp_gpu_checker.py
