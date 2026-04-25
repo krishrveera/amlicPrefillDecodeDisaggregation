@@ -32,11 +32,15 @@ echo "============================================"
 # Write LMCache config with resolved Redis host
 mkdir -p /tmp/amlic-configs
 cat > /tmp/amlic-configs/lmcache-prefiller-config.yaml <<EOF
-local_cpu: False
-max_local_cpu_size: 0
+local_cpu: True
+max_local_cpu_size: 5
 max_local_disk_size: 0
 remote_url: "redis://${REDIS_HOST}:${REDIS_PORT}"
 remote_serde: "naive"
+enable_pd: True
+pd_role: "prefill"
+pd_peer_host: "${VM_DECODE_IP}"
+pd_peer_init_port: 8300
 EOF
 
 KV_TRANSFER_CONFIG='{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_producer","kv_connector_extra_config":{"discard_partial_chunks":false}}'
@@ -47,7 +51,7 @@ cat > /tmp/amlic-start.sh <<'STARTEOF'
 #!/bin/bash
 set -e
 pip install lmcache -q
-exec python -m vllm.entrypoints.openai.api_server \
+exec python3 -m vllm.entrypoints.openai.api_server \
     --model "$MODEL" \
     --host 0.0.0.0 \
     --port "$PORT" \
