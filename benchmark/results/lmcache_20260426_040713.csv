@@ -1,0 +1,16 @@
+condition,prompt_label,prompt_tokens,run,ttft_ms,e2e_ms,itl_ms,throughput_tps,output_tokens,status
+lmcache,P1_tiny,46,1,175.15,2809.61,26.61,35.592,100,success
+lmcache,P1_tiny,46,2,167.97,2804.32,26.63,35.659,100,success
+lmcache,P1_tiny,46,3,235.26,2878.15,26.7,34.745,100,success
+lmcache,P2_small,72,1,164.76,2811.38,26.73,35.57,100,success
+lmcache,P2_small,72,2,227.24,2853.14,26.52,35.049,100,success
+lmcache,P2_small,72,3,167.27,2816.91,26.76,35.5,100,success
+lmcache,P3_medium,100,1,166.97,2817.9,26.78,35.487,100,success
+lmcache,P3_medium,100,2,214.0,2867.77,26.81,34.87,100,success
+lmcache,P3_medium,100,3,168.39,2818.24,26.77,35.483,100,success
+lmcache,P4_large,384,1,211.89,2850.84,26.66,35.077,100,success
+lmcache,P4_large,384,2,164.42,2843.68,27.06,35.166,100,success
+lmcache,P4_large,384,3,173.39,2903.54,27.58,34.441,100,success
+lmcache,P5_xlarge,261,1,167.58,2834.09,26.93,35.285,100,success
+lmcache,P5_xlarge,261,2,167.49,2835.03,26.94,35.273,100,success
+lmcache,P5_xlarge,261,3,180.9,2849.23,26.95,35.097,100,success

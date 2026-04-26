@@ -1,0 +1,152 @@
+{
+  "condition": "lmcache",
+  "timestamp": "20260426_040713",
+  "endpoint": "http://localhost:9000/v1/chat/completions",
+  "config": {
+    "runs": 3,
+    "max_tokens": 100,
+    "warmup": 1
+  },
+  "results": {
+    "P1_tiny": {
+      "prompt_tokens": 46,
+      "ttft_ms": {
+        "mean": 192.79,
+        "std": 36.95,
+        "min": 167.97,
+        "max": 235.26
+      },
+      "e2e_ms": {
+        "mean": 2830.69,
+        "std": 41.18,
+        "min": 2804.32,
+        "max": 2878.15
+      },
+      "itl_ms": {
+        "mean": 26.65,
+        "std": 0.05,
+        "min": 26.61,
+        "max": 26.7
+      },
+      "throughput_tps": {
+        "mean": 35.33,
+        "std": 0.51,
+        "min": 34.74,
+        "max": 35.66
+      },
+      "success_rate": 1.0
+    },
+    "P2_small": {
+      "prompt_tokens": 72,
+      "ttft_ms": {
+        "mean": 186.42,
+        "std": 35.37,
+        "min": 164.76,
+        "max": 227.24
+      },
+      "e2e_ms": {
+        "mean": 2827.14,
+        "std": 22.68,
+        "min": 2811.38,
+        "max": 2853.14
+      },
+      "itl_ms": {
+        "mean": 26.67,
+        "std": 0.13,
+        "min": 26.52,
+        "max": 26.76
+      },
+      "throughput_tps": {
+        "mean": 35.37,
+        "std": 0.28,
+        "min": 35.05,
+        "max": 35.57
+      },
+      "success_rate": 1.0
+    },
+    "P3_medium": {
+      "prompt_tokens": 100,
+      "ttft_ms": {
+        "mean": 183.12,
+        "std": 26.75,
+        "min": 166.97,
+        "max": 214.0
+      },
+      "e2e_ms": {
+        "mean": 2834.64,
+        "std": 28.69,
+        "min": 2817.9,
+        "max": 2867.77
+      },
+      "itl_ms": {
+        "mean": 26.79,
+        "std": 0.02,
+        "min": 26.77,
+        "max": 26.81
+      },
+      "throughput_tps": {
+        "mean": 35.28,
+        "std": 0.36,
+        "min": 34.87,
+        "max": 35.49
+      },
+      "success_rate": 1.0
+    },
+    "P4_large": {
+      "prompt_tokens": 384,
+      "ttft_ms": {
+        "mean": 183.23,
+        "std": 25.22,
+        "min": 164.42,
+        "max": 211.89
+      },
+      "e2e_ms": {
+        "mean": 2866.02,
+        "std": 32.69,
+        "min": 2843.68,
+        "max": 2903.54
+      },
+      "itl_ms": {
+        "mean": 27.1,
+        "std": 0.46,
+        "min": 26.66,
+        "max": 27.58
+      },
+      "throughput_tps": {
+        "mean": 34.89,
+        "std": 0.4,
+        "min": 34.44,
+        "max": 35.17
+      },
+      "success_rate": 1.0
+    },
+    "P5_xlarge": {
+      "prompt_tokens": 261,
+      "ttft_ms": {
+        "mean": 171.99,
+        "std": 7.72,
+        "min": 167.49,
+        "max": 180.9
+      },
+      "e2e_ms": {
+        "mean": 2839.45,
+        "std": 8.48,
+        "min": 2834.09,
+        "max": 2849.23
+      },
+      "itl_ms": {
+        "mean": 26.94,
+        "std": 0.01,
+        "min": 26.93,
+        "max": 26.95
+      },
+      "throughput_tps": {
+        "mean": 35.22,
+        "std": 0.11,
+        "min": 35.1,
+        "max": 35.28
+      },
+      "success_rate": 1.0
+    }
+  }
+}

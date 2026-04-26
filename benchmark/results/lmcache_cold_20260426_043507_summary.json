@@ -1,0 +1,243 @@
+{
+  "condition": "lmcache_cold",
+  "cache_state": "cold_cache",
+  "timestamp": "20260426_043507",
+  "endpoint": "http://localhost:9000/v1/chat/completions",
+  "config": {
+    "runs": 3,
+    "max_tokens": 100,
+    "warmup": 1
+  },
+  "results": {
+    "P1_tiny": {
+      "prompt_tokens": 46,
+      "ttft_ms": {
+        "mean": 167.9,
+        "std": 15.55,
+        "min": 158.14,
+        "max": 185.83
+      },
+      "e2e_ms": {
+        "mean": 2806.12,
+        "std": 2.89,
+        "min": 2804.35,
+        "max": 2809.45
+      },
+      "itl_ms": {
+        "mean": 26.65,
+        "std": 0.13,
+        "min": 26.5,
+        "max": 26.73
+      },
+      "throughput_tps": {
+        "mean": 35.64,
+        "std": 0.04,
+        "min": 35.59,
+        "max": 35.66
+      },
+      "prefill_duration_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "decode_duration_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "kv_gap_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "success_rate": 1.0
+    },
+    "P2_small": {
+      "prompt_tokens": 72,
+      "ttft_ms": {
+        "mean": 189.08,
+        "std": 45.58,
+        "min": 161.95,
+        "max": 241.7
+      },
+      "e2e_ms": {
+        "mean": 2840.79,
+        "std": 45.36,
+        "min": 2814.31,
+        "max": 2893.17
+      },
+      "itl_ms": {
+        "mean": 26.78,
+        "std": 0.01,
+        "min": 26.78,
+        "max": 26.79
+      },
+      "throughput_tps": {
+        "mean": 35.21,
+        "std": 0.56,
+        "min": 34.56,
+        "max": 35.53
+      },
+      "prefill_duration_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "decode_duration_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "kv_gap_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "success_rate": 1.0
+    },
+    "P3_medium": {
+      "prompt_tokens": 100,
+      "ttft_ms": {
+        "mean": 187.51,
+        "std": 48.71,
+        "min": 157.8,
+        "max": 243.72
+      },
+      "e2e_ms": {
+        "mean": 2835.03,
+        "std": 29.87,
+        "min": 2814.78,
+        "max": 2869.33
+      },
+      "itl_ms": {
+        "mean": 26.74,
+        "std": 0.19,
+        "min": 26.52,
+        "max": 26.87
+      },
+      "throughput_tps": {
+        "mean": 35.28,
+        "std": 0.37,
+        "min": 34.85,
+        "max": 35.53
+      },
+      "prefill_duration_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "decode_duration_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "kv_gap_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "success_rate": 1.0
+    },
+    "P4_large": {
+      "prompt_tokens": 384,
+      "ttft_ms": {
+        "mean": 162.65,
+        "std": 3.35,
+        "min": 160.63,
+        "max": 166.52
+      },
+      "e2e_ms": {
+        "mean": 2857.86,
+        "std": 16.27,
+        "min": 2846.74,
+        "max": 2876.53
+      },
+      "itl_ms": {
+        "mean": 27.22,
+        "std": 0.18,
+        "min": 27.11,
+        "max": 27.43
+      },
+      "throughput_tps": {
+        "mean": 34.99,
+        "std": 0.2,
+        "min": 34.76,
+        "max": 35.13
+      },
+      "prefill_duration_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "decode_duration_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "kv_gap_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "success_rate": 1.0
+    },
+    "P5_xlarge": {
+      "prompt_tokens": 261,
+      "ttft_ms": {
+        "mean": 170.1,
+        "std": 16.81,
+        "min": 160.04,
+        "max": 189.5
+      },
+      "e2e_ms": {
+        "mean": 2855.91,
+        "std": 31.78,
+        "min": 2834.52,
+        "max": 2892.42
+      },
+      "itl_ms": {
+        "mean": 27.13,
+        "std": 0.42,
+        "min": 26.78,
+        "max": 27.59
+      },
+      "throughput_tps": {
+        "mean": 35.02,
+        "std": 0.39,
+        "min": 34.57,
+        "max": 35.28
+      },
+      "prefill_duration_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "decode_duration_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "kv_gap_ms": {
+        "mean": null,
+        "std": null,
+        "min": null,
+        "max": null
+      },
+      "success_rate": 1.0
+    }
+  }
+}

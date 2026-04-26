@@ -1,0 +1,16 @@
+condition,cache_state,prompt_label,prompt_tokens,run,ttft_ms,e2e_ms,itl_ms,throughput_tps,output_tokens,prefill_duration_ms,decode_duration_ms,kv_gap_ms,status
+collocated,warm_cache,P1_tiny,46,1,110.18,2740.09,26.56,36.495,100,,,,success
+collocated,warm_cache,P1_tiny,46,2,164.02,2783.81,26.46,35.922,100,,,,success
+collocated,warm_cache,P1_tiny,46,3,107.64,2742.44,26.61,36.464,100,,,,success
+collocated,warm_cache,P2_small,72,1,122.05,2755.0,26.6,36.298,100,,,,success
+collocated,warm_cache,P2_small,72,2,107.29,2742.87,26.62,36.458,100,,,,success
+collocated,warm_cache,P2_small,72,3,149.87,2769.26,26.46,36.111,100,,,,success
+collocated,warm_cache,P3_medium,100,1,108.74,2745.22,26.63,36.427,100,,,,success
+collocated,warm_cache,P3_medium,100,2,116.12,2750.59,26.61,36.356,100,,,,success
+collocated,warm_cache,P3_medium,100,3,106.47,2742.03,26.62,36.469,100,,,,success
+collocated,warm_cache,P4_large,384,1,151.71,2775.43,26.5,36.03,100,,,,success
+collocated,warm_cache,P4_large,384,2,121.9,2777.35,26.82,36.006,100,,,,success
+collocated,warm_cache,P4_large,384,3,121.71,2779.41,26.85,35.979,100,,,,success
+collocated,warm_cache,P5_xlarge,261,1,109.65,2829.66,27.47,35.34,100,,,,success
+collocated,warm_cache,P5_xlarge,261,2,591.24,3236.65,26.72,30.896,100,,,,success
+collocated,warm_cache,P5_xlarge,261,3,157.75,2803.76,26.73,35.666,100,,,,success

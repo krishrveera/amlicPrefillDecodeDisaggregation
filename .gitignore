@@ -29,11 +29,6 @@ env/
 .DS_Store
 Thumbs.db
 
-# Benchmark results — keep .gitkeep, ignore output files
-benchmark/results/*.csv
-benchmark/results/*.json
-benchmark/results/*.tmp
-
 # Analysis outputs
 analysis/figures/*.png
 analysis/figures/*.pdf
