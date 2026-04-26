@@ -24,7 +24,20 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+
+# ── Per-request timing store (last 100 requests) ─────────────────────────────
+_timing_store: dict = {}
+_timing_order: list = []  # insertion-ordered keys for eviction
+
+def _store_timing(request_id: str, data: dict):
+    if request_id in _timing_store:
+        return
+    _timing_store[request_id] = data
+    _timing_order.append(request_id)
+    if len(_timing_order) > 100:
+        oldest = _timing_order.pop(0)
+        _timing_store.pop(oldest, None)
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -168,13 +181,14 @@ async def _handle_completions(api: str, request: Request):
     try:
         req_data = await request.json()
         request_id = str(uuid.uuid4())
-        t_start = time.perf_counter()
 
         # 1. Send to prefill
+        t_prefill_sent = time.time() * 1000
         prefill_client = get_next_client(request.app.state, "prefill")
         response, prefill_ms = await send_prefill_request(
             prefill_client, api, req_data, request_id
         )
+        t_prefill_done = time.time() * 1000
 
         # 2. Extract KV transfer params (NIXL only — LMCacheConnectorV1 uses
         #    Redis internally and does not return params here)
@@ -197,10 +211,26 @@ async def _handle_completions(api: str, request: Request):
         )
 
         async def generate():
+            t_decode_sent = time.time() * 1000
             async for chunk in stream_decode_response(
                 decode_client, api, req_data, request_id
             ):
                 yield chunk
+            t_decode_done = time.time() * 1000
+            decode_ms = t_decode_done - t_decode_sent
+            kv_gap_ms  = t_decode_sent - t_prefill_done
+            total_ms   = t_decode_done - t_prefill_sent
+            _store_timing(request_id, {
+                "request_id":          request_id,
+                "prefill_duration_ms": round(prefill_ms, 2),
+                "decode_duration_ms":  round(decode_ms, 2),
+                "kv_gap_ms":           round(kv_gap_ms, 2),
+                "total_ms":            round(total_ms, 2),
+            })
+            logger.info(
+                "[%s] prefill=%.0fms decode=%.0fms kv_gap=%.0fms total=%.0fms",
+                request_id[:8], prefill_ms, decode_ms, kv_gap_ms, total_ms,
+            )
 
         return StreamingResponse(generate(), media_type="application/json")
 
@@ -218,6 +248,15 @@ async def handle_completions(request: Request):
 @app.post("/v1/chat/completions")
 async def handle_chat_completions(request: Request):
     return await _handle_completions("/chat/completions", request)
+
+
+@app.get("/timing/{request_id}")
+async def get_timing(request_id: str):
+    """Return pipeline timing breakdown for a completed request."""
+    data = _timing_store.get(request_id)
+    if data is None:
+        return JSONResponse(status_code=404, content={"error": "request_id not found"})
+    return JSONResponse(content=data)
 
 
 @app.get("/health")

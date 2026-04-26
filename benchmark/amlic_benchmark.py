@@ -18,12 +18,12 @@ import argparse
 import asyncio
 import json
 import math
-import os
 import statistics
-import sys
+import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 import pandas as pd
@@ -103,6 +103,34 @@ PROMPTS = [
 ]
 
 
+def flush_redis(redis_host: str):
+    result = subprocess.run(
+        ["redis-cli", "-h", redis_host, "FLUSHALL"],
+        capture_output=True, text=True, timeout=10,
+    )
+    if result.returncode == 0:
+        print("  [Redis flushed]")
+    else:
+        print(f"  [Redis flush failed: {result.stderr.strip()}]")
+
+
+async def fetch_pipeline_timing(
+    client: httpx.AsyncClient,
+    timing_base_url: str,
+    request_id: str,
+    timeout: float = 10.0,
+) -> dict | None:
+    try:
+        resp = await client.get(
+            f"{timing_base_url}/timing/{request_id}", timeout=timeout
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception:
+        pass
+    return None
+
+
 async def measure_request(
     client: httpx.AsyncClient,
     endpoint: str,
@@ -110,6 +138,7 @@ async def measure_request(
     prompt_text: str,
     max_tokens: int,
     timeout: float,
+    timing_base_url: str | None = None,
 ) -> dict:
     payload = {
         "model": model,
@@ -123,6 +152,7 @@ async def measure_request(
     e2e_ms = None
     prompt_tokens = None
     output_tokens = None
+    request_id = None
     status = "success"
     t_start = time.perf_counter()
 
@@ -138,6 +168,9 @@ async def measure_request(
                     "throughput_tps": None,
                     "prompt_tokens": None,
                     "output_tokens": None,
+                    "prefill_duration_ms": None,
+                    "decode_duration_ms": None,
+                    "kv_gap_ms": None,
                     "status": f"failed_{response.status_code}",
                 }
 
@@ -153,6 +186,10 @@ async def measure_request(
                     chunk = json.loads(raw)
                 except json.JSONDecodeError:
                     continue
+
+                # capture request_id from any chunk for proxy timing lookup
+                if request_id is None and "id" in chunk:
+                    request_id = chunk["id"]
 
                 # capture TTFT on first content token
                 if ttft_ms is None:
@@ -179,6 +216,9 @@ async def measure_request(
             "throughput_tps": None,
             "prompt_tokens": None,
             "output_tokens": None,
+            "prefill_duration_ms": None,
+            "decode_duration_ms": None,
+            "kv_gap_ms": None,
             "status": f"failed_timeout: {exc}",
         }
     except httpx.RequestError as exc:
@@ -189,6 +229,9 @@ async def measure_request(
             "throughput_tps": None,
             "prompt_tokens": None,
             "output_tokens": None,
+            "prefill_duration_ms": None,
+            "decode_duration_ms": None,
+            "kv_gap_ms": None,
             "status": f"failed_connection: {exc}",
         }
 
@@ -205,14 +248,28 @@ async def measure_request(
     if output_tokens is not None and e2e_ms is not None and e2e_ms > 0:
         throughput_tps = output_tokens / (e2e_ms / 1000)
 
+    # fetch pipeline timing from proxy if applicable
+    prefill_duration_ms = None
+    decode_duration_ms = None
+    kv_gap_ms = None
+    if timing_base_url and request_id:
+        timing = await fetch_pipeline_timing(client, timing_base_url, request_id)
+        if timing:
+            prefill_duration_ms = timing.get("prefill_duration_ms")
+            decode_duration_ms  = timing.get("decode_duration_ms")
+            kv_gap_ms           = timing.get("kv_gap_ms")
+
     return {
-        "ttft_ms": round(ttft_ms, 2) if ttft_ms is not None else None,
-        "e2e_ms": round(e2e_ms, 2) if e2e_ms is not None else None,
-        "itl_ms": round(itl_ms, 2) if itl_ms is not None else None,
-        "throughput_tps": round(throughput_tps, 3) if throughput_tps is not None else None,
-        "prompt_tokens": prompt_tokens,
-        "output_tokens": output_tokens,
-        "status": status,
+        "ttft_ms":            round(ttft_ms, 2)         if ttft_ms         is not None else None,
+        "e2e_ms":             round(e2e_ms, 2)          if e2e_ms          is not None else None,
+        "itl_ms":             round(itl_ms, 2)          if itl_ms          is not None else None,
+        "throughput_tps":     round(throughput_tps, 3)  if throughput_tps  is not None else None,
+        "prompt_tokens":      prompt_tokens,
+        "output_tokens":      output_tokens,
+        "prefill_duration_ms": prefill_duration_ms,
+        "decode_duration_ms":  decode_duration_ms,
+        "kv_gap_ms":           kv_gap_ms,
+        "status":             status,
     }
 
 
@@ -225,17 +282,25 @@ async def run_condition(
     max_tokens: int,
     warmup: int,
     timeout: float,
+    flush_redis_flag: bool,
+    redis_host: str | None,
+    cache_state: str,
 ) -> list[dict]:
     results = []
+
+    parsed = urlparse(endpoint)
+    is_proxy = str(parsed.port) == "9000"
+    timing_base_url = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}" if is_proxy else None
 
     async with httpx.AsyncClient() as client:
         # warmup
         for prompt in prompts:
-            for w in range(warmup):
+            for _ in range(warmup):
                 print(f"[Warmup] {prompt['label']}...", end=" ", flush=True)
                 t0 = time.perf_counter()
-                r = await measure_request(
-                    client, endpoint, model, prompt["text"], max_tokens, timeout
+                await measure_request(
+                    client, endpoint, model, prompt["text"], max_tokens, timeout,
+                    timing_base_url=timing_base_url,
                 )
                 elapsed = int((time.perf_counter() - t0) * 1000)
                 print(f"done ({elapsed}ms)")
@@ -245,35 +310,44 @@ async def run_condition(
         # timed runs
         for idx, prompt in enumerate(prompts):
             label = prompt["label"]
+
+            if flush_redis_flag and redis_host:
+                flush_redis(redis_host)
+
             print(f"[{idx + 1}/{len(prompts)}] {label}")
             run_results = []
 
             for run_num in range(1, runs + 1):
                 r = await measure_request(
-                    client, endpoint, model, prompt["text"], max_tokens, timeout
+                    client, endpoint, model, prompt["text"], max_tokens, timeout,
+                    timing_base_url=timing_base_url,
                 )
                 run_results.append(r)
 
-                ttft_disp = f"{r['ttft_ms']:.0f}ms" if r["ttft_ms"] is not None else "N/A"
-                e2e_disp  = f"{r['e2e_ms']:.0f}ms"  if r["e2e_ms"]  is not None else "N/A"
-                itl_disp  = f"{r['itl_ms']:.0f}ms"  if r["itl_ms"]  is not None else "N/A"
-                tps_disp  = f"{r['throughput_tps']:.1f}" if r["throughput_tps"] is not None else "N/A"
+                ttft_disp = f"{r['ttft_ms']:.0f}ms"        if r["ttft_ms"]        is not None else "N/A"
+                e2e_disp  = f"{r['e2e_ms']:.0f}ms"         if r["e2e_ms"]         is not None else "N/A"
+                itl_disp  = f"{r['itl_ms']:.0f}ms"         if r["itl_ms"]         is not None else "N/A"
+                tps_disp  = f"{r['throughput_tps']:.1f}"   if r["throughput_tps"] is not None else "N/A"
                 print(
                     f"  Run {run_num}: TTFT={ttft_disp}  E2E={e2e_disp}"
                     f"  ITL={itl_disp}  TPS={tps_disp}"
                 )
 
                 results.append({
-                    "condition":       condition,
-                    "prompt_label":    label,
-                    "prompt_tokens":   r["prompt_tokens"],
-                    "run":             run_num,
-                    "ttft_ms":         r["ttft_ms"],
-                    "e2e_ms":          r["e2e_ms"],
-                    "itl_ms":          r["itl_ms"],
-                    "throughput_tps":  r["throughput_tps"],
-                    "output_tokens":   r["output_tokens"],
-                    "status":          r["status"],
+                    "condition":           condition,
+                    "cache_state":         cache_state,
+                    "prompt_label":        label,
+                    "prompt_tokens":       r["prompt_tokens"],
+                    "run":                 run_num,
+                    "ttft_ms":             r["ttft_ms"],
+                    "e2e_ms":              r["e2e_ms"],
+                    "itl_ms":              r["itl_ms"],
+                    "throughput_tps":      r["throughput_tps"],
+                    "output_tokens":       r["output_tokens"],
+                    "prefill_duration_ms": r["prefill_duration_ms"],
+                    "decode_duration_ms":  r["decode_duration_ms"],
+                    "kv_gap_ms":           r["kv_gap_ms"],
+                    "status":              r["status"],
                 })
 
             # per-prompt mean line
@@ -319,6 +393,7 @@ def write_results(
     runs: int,
     max_tokens: int,
     warmup: int,
+    cache_state: str,
     output_dir: str,
 ) -> tuple[str, str]:
     output_path = Path(output_dir)
@@ -335,18 +410,22 @@ def write_results(
     for label, grp in df.groupby("prompt_label"):
         good = grp[grp["status"] == "success"]
         per_prompt[label] = {
-            "prompt_tokens":  int(grp["prompt_tokens"].dropna().iloc[0]) if not grp["prompt_tokens"].dropna().empty else None,
-            "ttft_ms":        _stats(good["ttft_ms"].tolist()),
-            "e2e_ms":         _stats(good["e2e_ms"].tolist()),
-            "itl_ms":         _stats(good["itl_ms"].tolist()),
-            "throughput_tps": _stats(good["throughput_tps"].tolist()),
-            "success_rate":   round(len(good) / len(grp), 3),
+            "prompt_tokens":      int(grp["prompt_tokens"].dropna().iloc[0]) if not grp["prompt_tokens"].dropna().empty else None,
+            "ttft_ms":            _stats(good["ttft_ms"].tolist()),
+            "e2e_ms":             _stats(good["e2e_ms"].tolist()),
+            "itl_ms":             _stats(good["itl_ms"].tolist()),
+            "throughput_tps":     _stats(good["throughput_tps"].tolist()),
+            "prefill_duration_ms": _stats(good["prefill_duration_ms"].tolist()) if "prefill_duration_ms" in good.columns else None,
+            "decode_duration_ms":  _stats(good["decode_duration_ms"].tolist())  if "decode_duration_ms"  in good.columns else None,
+            "kv_gap_ms":           _stats(good["kv_gap_ms"].tolist())            if "kv_gap_ms"           in good.columns else None,
+            "success_rate":       round(len(good) / len(grp), 3),
         }
 
     summary = {
-        "condition": condition,
-        "timestamp": ts,
-        "endpoint":  endpoint,
+        "condition":   condition,
+        "cache_state": cache_state,
+        "timestamp":   ts,
+        "endpoint":    endpoint,
         "config": {
             "runs":       runs,
             "max_tokens": max_tokens,
@@ -365,43 +444,74 @@ def print_summary_table(summary_json_path: str):
     with open(summary_json_path) as f:
         summary = json.load(f)
 
+    cache_state = summary.get("cache_state", "unknown")
     rows = []
     for label in sorted(summary["results"]):
         r = summary["results"][label]
+
+        def _fmt(section, key=None):
+            if section is None:
+                return "N/A"
+            val = section.get("mean") if key is None else section.get(key)
+            return f"{val:.0f}" if val is not None else "N/A"
+
+        prefill_disp = _fmt(r.get("prefill_duration_ms"))
+        decode_disp  = _fmt(r.get("decode_duration_ms"))
+
         rows.append([
             label,
             r["prompt_tokens"],
-            f"{r['ttft_ms']['mean']:.0f}"        if r["ttft_ms"]["mean"]        is not None else "N/A",
-            f"{r['e2e_ms']['mean']:.0f}"          if r["e2e_ms"]["mean"]         is not None else "N/A",
-            f"{r['itl_ms']['mean']:.0f}"          if r["itl_ms"]["mean"]         is not None else "N/A",
-            f"{r['throughput_tps']['mean']:.1f}"  if r["throughput_tps"]["mean"] is not None else "N/A",
+            _fmt(r["ttft_ms"]),
+            _fmt(r["e2e_ms"]),
+            _fmt(r["itl_ms"]),
+            f"{r['throughput_tps']['mean']:.1f}" if r["throughput_tps"]["mean"] is not None else "N/A",
+            prefill_disp,
+            decode_disp,
             f"{r['success_rate']:.0%}",
+            cache_state,
         ])
 
     print(tabulate(
         rows,
-        headers=["prompt_label", "prompt_tokens", "ttft_mean_ms", "e2e_mean_ms",
-                 "itl_mean_ms", "tps_mean", "success_rate"],
+        headers=[
+            "prompt_label", "prompt_tokens",
+            "ttft_mean_ms", "e2e_mean_ms", "itl_mean_ms", "tps_mean",
+            "prefill_ms", "decode_ms",
+            "success_rate", "cache_state",
+        ],
         tablefmt="simple",
     ))
 
 
 def main():
     ap = argparse.ArgumentParser(description="AMLIC latency benchmark")
-    ap.add_argument("--endpoint",   required=True,  help="Full URL of chat completions endpoint")
-    ap.add_argument("--condition",  required=True,  help="Label for this run (collocated/lmcache/zmq)")
-    ap.add_argument("--model",      default="meta-llama/Llama-3.2-3B-Instruct")
-    ap.add_argument("--runs",       type=int,   default=3)
-    ap.add_argument("--max-tokens", type=int,   default=100)
-    ap.add_argument("--warmup",     type=int,   default=1)
-    ap.add_argument("--output",     default="benchmark/results/")
-    ap.add_argument("--timeout",    type=float, default=120.0)
+    ap.add_argument("--endpoint",    required=True,  help="Full URL of chat completions endpoint")
+    ap.add_argument("--condition",   required=True,  help="Label for this run (collocated/lmcache/zmq)")
+    ap.add_argument("--model",       default="meta-llama/Llama-3.2-3B-Instruct")
+    ap.add_argument("--runs",        type=int,   default=3)
+    ap.add_argument("--max-tokens",  type=int,   default=100)
+    ap.add_argument("--warmup",      type=int,   default=1)
+    ap.add_argument("--output",      default="benchmark/results/")
+    ap.add_argument("--timeout",     type=float, default=120.0)
+    ap.add_argument("--flush-redis", action="store_true", default=False,
+                    help="Flush Redis before each new prompt's runs (requires --redis-host)")
+    ap.add_argument("--redis-host",  default=None,
+                    help="Redis host for --flush-redis (e.g. 100.85.63.45)")
     args = ap.parse_args()
+
+    if args.flush_redis and not args.redis_host:
+        print("WARNING: --flush-redis set but --redis-host not provided. Redis will NOT be flushed.")
+
+    cache_state = "cold_cache" if args.flush_redis else "warm_cache"
 
     print(f"\nAMLIC Benchmark — condition: {args.condition}")
     print(f"Endpoint: {args.endpoint}")
     print(f"Model: {args.model}")
-    print(f"Runs: {args.runs} | Max tokens: {args.max_tokens} | Warmup: {args.warmup}\n")
+    print(f"Runs: {args.runs} | Max tokens: {args.max_tokens} | Warmup: {args.warmup}")
+    print(f"Cache state: {cache_state}")
+    if args.flush_redis and args.redis_host:
+        print(f"Redis flush: {args.redis_host} (before each prompt)")
+    print()
 
     results = asyncio.run(run_condition(
         endpoint=args.endpoint,
@@ -412,6 +522,9 @@ def main():
         max_tokens=args.max_tokens,
         warmup=args.warmup,
         timeout=args.timeout,
+        flush_redis_flag=args.flush_redis,
+        redis_host=args.redis_host,
+        cache_state=cache_state,
     ))
 
     # per-prompt success summary
@@ -429,6 +542,7 @@ def main():
         runs=args.runs,
         max_tokens=args.max_tokens,
         warmup=args.warmup,
+        cache_state=cache_state,
         output_dir=args.output,
     )
 

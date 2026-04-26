@@ -37,10 +37,6 @@ max_local_cpu_size: 5
 max_local_disk_size: 0
 remote_url: "redis://${REDIS_HOST}:${REDIS_PORT}"
 remote_serde: "naive"
-enable_pd: True
-pd_role: "prefill"
-pd_peer_host: "${VM_DECODE_IP}"
-pd_peer_init_port: 8300
 EOF
 
 KV_TRANSFER_CONFIG='{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_producer","kv_connector_extra_config":{"discard_partial_chunks":false}}'
