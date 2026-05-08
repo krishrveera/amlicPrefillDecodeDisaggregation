@@ -62,11 +62,13 @@ This project implements and benchmarks **collocated** vs **disaggregated** (pref
 │   ├── proxy_server.py           # FastAPI proxy: prefill → Redis → decode
 │   └── configs/                  # LMCache YAML configs
 │
-├── benchmark/                    # Benchmarking framework
+├── benchmark/                    # Benchmarking & analysis
 │   ├── amlic_benchmark.py        # Prompt-sweep latency benchmark
 │   ├── poisson_load.py           # Poisson-arrival load generator
 │   ├── client.py                 # Async OpenAI-compatible streaming client
 │   ├── workloads.py              # Workload profiles + prompt generation
+│   ├── compute_threshold.py      # Compute crossover threshold N
+│   ├── plot_results.py           # Generate benchmark plots
 │   └── figures_vllm_final/       # Final benchmark result plots
 │
 ├── router/                       # Adaptive router
@@ -79,10 +81,6 @@ This project implements and benchmarks **collocated** vs **disaggregated** (pref
 │   ├── run_full_benchmark.sh     # Run complete benchmark suite
 │   ├── health_check.sh           # Check all services are healthy
 │   └── start_amlic.py            # Orchestrated startup
-│
-└── analysis/                     # Data analysis
-    ├── compute_threshold.py      # Compute crossover threshold N
-    └── plot_results.py           # Generate benchmark plots
 ```
 
 ---
