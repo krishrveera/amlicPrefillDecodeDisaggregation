@@ -1,6 +1,5 @@
 # Environment
 .env
-.env.example
 *.env.local
 
 # Python
@@ -29,11 +28,15 @@ env/
 .DS_Store
 Thumbs.db
 
-# Analysis outputs
+# Analysis simulation outputs (not part of core project)
 analysis/figures/*.png
 analysis/figures/*.pdf
+analysis/figures/*.json
+analysis/simulator.py
+analysis/full_analysis.py
+analysis/plot_session_*.py
 
-# Model cache (don't commit multi-GB model weights)
+# Model cache
 models/
 .cache/
 
@@ -48,11 +51,21 @@ logs/
 *.pem
 *.key
 
-# AMLIC runtime state (zone info written by start_amlic.py)
+# Runtime state
 .amlic_state.json
 
-# Claude Code transient files
+# AI tool configs
 .claude/
-*.txt
-claude_code_prompt_lmcache.md
+.gemini/
+
+# Temp / personal files
+_tmp_*
+SESSION_*.md
+SETUP_STATUS.md
+task.md.resolved
 krv2123_gcp_gpu_checker.py
+iperf_raw.json
+*.pdf
+
+# Sajal benchmark (not needed)
+sajal_benchmark/
