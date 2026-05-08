@@ -1,4 +1,4 @@
-# AMLIC — Adaptive Multi-tier LLM Inference on Cloud
+# Prefill-Decode Disaggregated Inference Serving
 
 > Prefill/Decode Disaggregation for LLM Serving using vLLM + LMCache
 
