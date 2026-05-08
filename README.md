@@ -36,10 +36,10 @@ This project implements and benchmarks **collocated** vs **disaggregated** (pref
 
 ### Hardware Requirements
 
-| Role | GPU | VRAM | Example VM |
-|------|-----|------|------------|
+| Role                 | GPU                       | VRAM     | Example VM            |
+| -------------------- | ------------------------- | -------- | --------------------- |
 | Prefill + Collocated | NVIDIA L4 (or equivalent) | ≥ 24 GB | GCP `g2-standard-4` |
-| Decode | NVIDIA L4 (or equivalent) | ≥ 24 GB | GCP `g2-standard-4` |
+| Decode               | NVIDIA L4 (or equivalent) | ≥ 24 GB | GCP `g2-standard-4` |
 
 > **Note:** Both GPUs must use the same attention backend and dtype for LMCache KV cache compatibility. We used two L4 GPUs. A T4 decode GPU works but requires matching attention configs.
 
@@ -291,35 +291,28 @@ streamlit run demo/app.py
 
 ## Key Metrics
 
-| Metric | Description |
-|--------|-------------|
-| **TTFT** | Time to first token (ms) — user-perceived responsiveness |
-| **TPOT** | Time per output token (ms) — decode speed |
-| **ITL** | Inter-token latency (ms) — streaming smoothness |
-| **Throughput** | Output tokens per second |
-| **E2E Latency** | Total request latency from submission to last token |
+| Metric                | Description                                               |
+| --------------------- | --------------------------------------------------------- |
+| **TTFT**        | Time to first token (ms) — user-perceived responsiveness |
+| **TPOT**        | Time per output token (ms) — decode speed                |
+| **ITL**         | Inter-token latency (ms) — streaming smoothness          |
+| **Throughput**  | Output tokens per second                                  |
+| **E2E Latency** | Total request latency from submission to last token       |
 
 ## How It Works
 
 1. **Collocated**: A single GPU runs both prefill (processing the prompt) and decode (generating tokens). Under concurrent load, prefill and decode contend for GPU compute cycles.
-
 2. **Disaggregated**: GPU 1 runs prefill only, GPU 2 runs decode only. After prefill, the KV cache is serialized and sent through Redis (via LMCache) to the decode GPU. This eliminates prefill-decode contention but adds KV transfer overhead.
-
 3. **Proxy Server**: A FastAPI proxy (`infra/proxy_server.py`) coordinates the flow: it sends the prompt to prefill with `max_tokens=1` (triggering KV cache production), then forwards the full request to decode for token generation.
-
 4. **Adaptive Router**: Routes requests to collocated or disaggregated based on prompt length threshold N.
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| `nvidia-smi` not found | Install NVIDIA drivers or use a GCP Deep Learning VM image |
-| Model download fails | Verify `HF_TOKEN` has gated access to Llama models |
+| Issue                    | Solution                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| `nvidia-smi` not found | Install NVIDIA drivers or use a GCP Deep Learning VM image                           |
+| Model download fails     | Verify `HF_TOKEN` has gated access to Llama models                                 |
 | Redis connection refused | Check `REDIS_HOST` in `.env` matches Tailscale IP, ensure port 6379 is reachable |
-| KV cache transfer fails | Both GPUs must use same dtype (`float16`) and attention backend |
-| Decode returns empty | Check Redis has data: `redis-cli -h <REDIS_HOST> DBSIZE` |
-| Proxy timeout | Increase `httpx` timeout; verify both prefill and decode endpoints are healthy |
-
-## License
-
-Academic project — Columbia University COMS 6998 (Cloud Computing & Big Data).
+| KV cache transfer fails  | Both GPUs must use same dtype (`float16`) and attention backend                    |
+| Decode returns empty     | Check Redis has data:`redis-cli -h <REDIS_HOST> DBSIZE`                            |
+| Proxy timeout            | Increase `httpx` timeout; verify both prefill and decode endpoints are healthy     |
