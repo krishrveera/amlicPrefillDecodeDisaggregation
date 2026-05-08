@@ -63,6 +63,7 @@ _tmp_*
 SESSION_*.md
 SETUP_STATUS.md
 task.md.resolved
+krv2123_gcp_gpu_checker.py
 iperf_raw.json
 *.pdf
 
