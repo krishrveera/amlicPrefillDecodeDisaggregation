@@ -295,7 +295,6 @@ streamlit run demo/app.py
 | --------------------- | --------------------------------------------------------- |
 | **TTFT**        | Time to first token (ms) — user-perceived responsiveness |
 | **TPOT**        | Time per output token (ms) — decode speed                |
-| **ITL**         | Inter-token latency (ms) — streaming smoothness          |
 | **Throughput**  | Output tokens per second                                  |
 | **E2E Latency** | Total request latency from submission to last token       |
 
